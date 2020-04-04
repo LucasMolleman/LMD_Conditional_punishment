@@ -1,0 +1,1081 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library(knitr)
+library(ggplot2)
+# library(ggthemr)
+library(data.table)
+library(readr) 
+library(plyr)
+library(reshape2)
+library(scales)
+library(data.table)
+library("jtools")
+library(gridExtra)
+library(dplyr)
+library(foreign)
+library(ggpubr)
+library(readstata13)
+library(ggthemes)
+require(scales)
+require(DescTools)
+require(PropCIs)
+
+# if(!require(DescTools)){install.packages("DescTools")}
+# if(!require(PropCIs)){install.packages("PropCIs")}
+```
+
+```{r} 
+
+# Load data
+
+dfshort <- read.dta13("ExperimentData_afterClean_Short.dta")
+dfshort$experiment <- factor(dfshort$experiment, labels = c("CC Treatment", "CP Treatment") )
+dfshort$punish_type2 <- dfshort$punish_type
+dfshort$punish_type <- factor(dfshort$punish_type)
+dfshort$experiment <- factor(dfshort$experiment, labels = c("CC Treatment", "CP Treatment") )
+dfshort$punish_type <- factor(dfshort$punish_type)
+dfshort$coop <- factor(dfshort$stageone, labels=c('Cooperators', 'Defectors'))
+dfshort$expXcoop <- paste(dfshort$experiment, ": ", dfshort$coop, sep="")
+
+dflong <- read.dta13("ExperimentData_afterClean_Long.dta", convert.factors=TRUE)
+dflong$punish_type2 <- dflong$punish_type
+dflong$punish_type <- factor(dflong$punish_type)
+dflong$experiment <- factor(dflong$experiment, labels = c("CC Treatment", "CP Treatment") )
+dflong$coop <- factor(dflong$stageone, labels=c('Cooperators', 'Defectors'))
+
+```
+
+
+
+```{r}
+# Figure 1 in the main text
+
+ybar = 0.55
+
+sub <- filter(dfshort, ordered(dfshort$punish_type) > 0 & experiment == "CC Treatment")
+observed <- table(sub$punish_type)[2:5]
+CI <- data.frame(MultinomCI(observed,
+           conf.level=0.95,
+           method="sisonglaz")) 
+CI$punish_type <- row.names(CI)
+CI$punish_type
+
+cnt <- count(sub)
+lab1 <- c("Independent\nPunishment", "Norm\nEnforcement", "Decreasing\nPunishment", "Non-\nmonotonic")
+g1 <- ggplot(CI,aes(x = punish_type, y = est )) + 
+  geom_bar( aes(x=punish_type, y = est, fill=punish_type, color=punish_type ), stat="identity",  width = 0.6) +
+  geom_text(aes(label=lab1 ),vjust=-0.25,font.size=13) +
+    # geom_errorbar(aes(ymin=lwr.ci, ymax=upr.ci), color='black', width=0.1, position=p) +
+  # geom_point(aes(size=size,shape=punish_type,fill=punish_type), position=p)+ 
+    # scale_y_continuous( labels=scales::percent_format()) +
+    coord_cartesian(ylim=c(0,ybar)) + 
+    scale_y_continuous(breaks = seq(0,10,1) / 10) +
+    scale_color_manual(values = c("black", "black", "white", "white")) + 
+    scale_fill_manual(values = c("orange", "#359135", "#89a2c8", "grey")) + 
+   # scale_x_discrete(labels=lab,breaks= )  + 
+  annotate("text", x=4, y=ybar, label= paste("N =", cnt), fontface="bold",font.size=13 ) + 
+    # geom_text(aes(y = ((..count..)/sum(..count..)), label = percent((..count..)/sum(..count..)) ), stat = "count", vjust = -0.25) +
+     theme_bw() + 
+      labs( y     = 'Frequency',
+            x     = "Punishment Strategies",
+            title = 'CC Treatment'
+               ) + 
+      theme(panel.grid = element_blank(),
+            # axis.text.x = element_text(angle = 0, hjust = 0.5,color='black'),
+            axis.text.x = element_blank(),
+            axis.ticks.x = element_blank(),
+            axis.text = element_text(size = 13,color='black'),
+            text = element_text(size=13,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 8, 2, 5, "mm"))
+g1
+
+sub <- filter(dfshort, ordered(dfshort$punish_type) > 0 & experiment == "CP Treatment")
+observed <- table(sub$punish_type)[2:5]
+CI <- data.frame(MultinomCI(observed,
+           conf.level=0.95,
+           method="sisonglaz")) 
+CI$punish_type <- row.names(CI)
+
+cnt <- count(sub)
+# lab2 <- c("Independent\nPunishment", "Conformist\nPunishment", "Decreasing\nPunishment", "Non-\nmonotonic")
+g2 <- ggplot(CI,aes(x = punish_type, y = est )) + 
+  geom_bar( aes(x=punish_type, fill=punish_type, color=punish_type ), stat="identity",  width = 0.6) +
+    geom_text(aes(label=lab2),vjust=-0.25,font.size=13) +
+    # geom_errorbar(aes(ymin=lwr.ci, ymax=upr.ci), color='black', width=0.1, position=p) +
+  # geom_point(aes(size=size,shape=punish_type,fill=punish_type), position=p)+ 
+    scale_y_continuous(breaks = seq(0,10,1) / 10) +
+    coord_cartesian(ylim=c(0,ybar)) + 
+    scale_color_manual(values = c("black", "black", "white", "white")) + 
+    scale_fill_manual(values = c("orange", "#359135", "#89a2c8", "grey")) + 
+  # scale_x_discrete(labels=lab)  + 
+  annotate("text", x=4, y=ybar, label= paste("N =", cnt), fontface="bold",font.size=13 ) + 
+    # geom_text(aes(y = ((..count..)/sum(..count..)), label = percent((..count..)/sum(..count..)) ), stat = "count", vjust = -0.25) +
+     theme_bw() + 
+      labs( y     = '',
+            x     = "Punishment Strategies",
+            title = 'CP Treatment'
+               ) + 
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(size = 13,color='black'),
+            text = element_text(size=12,face="bold",color='black'), 
+            axis.text.x = element_blank(),
+            axis.ticks.x = element_blank(),
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 8, 2, 5, "mm"))
+g2
+
+g1A <- ggarrange(g1, g2,  ncol=2, nrow=1, legend="none", labels = c("A.", "B."))
+g1A
+
+jpeg("fig1AB.jpg", width = 3000, height = 1200, res = 300)
+g1A
+dev.off()
+#
+```
+
+
+```{r}
+std <- function(x) sd(x)/sqrt(length(x))
+df0 <- aggregate(punish ~ experiment + punish_type + other_punish, data=dflong, 'mean')
+df0$avg <- df0$punish
+df0$std <- aggregate(punish ~ experiment + punish_type + other_punish, data=dflong, std)$punish
+df0$low <- df0$avg - df0$std
+df0$up <- df0$avg + df0$std
+df0$low[df0$punish_type != 1 & df0$punish_type != 2] <- NA
+df0$up[df0$punish_type != 1 & df0$punish_type != 2] <- NA
+df0$size[df0$punish_type == 1 | df0$punish_type == 2] <- 2
+df0$size[df0$punish_type != 1 & df0$punish_type != 2] <- 1
+df0
+
+p <- position_dodge(0.5)
+
+sub <- filter(df0, ordered(df0$punish_type)>0 & experiment == "CC Treatment") 
+cnt <- count(filter(dfshort, ordered(dfshort$punish_type) > 0 & experiment == "CC Treatment"))
+lab1 <- c("Independent Punishment", "Norm Enforcement", "Decreasing Punishment", "Non-monotonic")
+sub$punish_type <- factor(sub$punish_type, labels = lab1)
+g3 <- ggplot(sub, aes(x=other_punish, y=punish, group=punish_type, color=punish_type)) + 
+  geom_line(position=p) +
+  geom_errorbar(aes(ymin=low, ymax=up), color='black', width=0, position=p) +
+  geom_point(aes(size=size,shape=punish_type,fill=punish_type), position=p)+
+  annotate("text", x=9, y=9, label= paste("N =", cnt), fontface="bold",font.size=13 ) + 
+    scale_color_manual(values = c("#e06c00", "#018700", "#89a2c8", "grey")) + 
+    scale_fill_manual(values = c("#e06c00", "#018700", "#89a2c8", "grey")) + 
+    scale_shape_manual(values = c(17 , 15, 4, 20) ) + 
+    coord_cartesian(ylim=c(0, 9)) + 
+  scale_y_continuous(breaks = seq(0,10,2)) + 
+    scale_size(range = c(1, 3)) + 
+    scale_x_continuous(breaks = seq(0,10,1) ,
+                       labels = c("<5", "10", "20" ,  "30" , "40" , "50" , "60" , "70" ,  "80" , "90", ">95")) + 
+    theme_bw() + 
+    theme(axis.title = element_text(face = "bold")) +
+    labs( y     = 'Deduction Points',
+          x     = "Reference Group Behavior\n% of Cooperators",
+          title = 'CC Treatment',
+          fill = "",
+          color = "",
+          shape = "",
+          size = ""
+             ) +
+    theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 13,color='black'), text = element_text(size=13, face="bold"),
+            plot.margin = margin(2, 8, 2, 8, "mm"),
+        legend.text = element_text(size=12,face = "plain"),
+       legend.spacing.x = unit(0.2, 'cm')) +
+  guides(size = FALSE, col = guide_legend(nrow = 1) )
+
+
+
+sub <- filter(df0, ordered(df0$punish_type)>0 & experiment == "CP Treatment") 
+cnt <- count(filter(dfshort, ordered(dfshort$punish_type) > 0 & experiment == "CP Treatment"))
+lab2 <- c("Independent Punishment", "Conformist Punishment", "Decreasing Punishment", "Non-monotonic")
+sub$punish_type <- factor(sub$punish_type, labels = lab2)
+g4 <- ggplot(sub, aes(x=other_punish, y=punish, group=punish_type,color=punish_type)) + 
+  geom_line(aes(color=punish_type), position=p) +
+  geom_errorbar(aes(ymin=low, ymax=up), color='black', width=0, position=p) +
+  geom_point(aes(size=size,shape=punish_type,fill=punish_type,color=punish_type), position=p)+
+  annotate("text", x=9, y=9, label= paste("N =", cnt), fontface="bold",font.size=13  ) + 
+      scale_color_manual(values = c("#e06c00", "#018700", "#89a2c8", "grey")) + 
+    scale_fill_manual(values = c("#e06c00", "#018700", "#89a2c8", "grey")) + 
+    scale_shape_manual(values = c(17 , 23, 4, 20) ) + 
+    scale_y_continuous(breaks = seq(0,10,2)) + 
+    coord_cartesian(ylim=c(0, 9)) + 
+    scale_size(range = c(1, 3)) + 
+    scale_x_continuous(breaks = seq(0,10,1) ,
+                       labels = seq(0,10,1)) + 
+
+    theme_bw() + 
+    labs( y     = '',
+          x     = "Reference Group Behavior\nMean Deduction Points",
+          title = 'CP Treatment',
+          fill = "",
+          color = "",
+          shape = "",
+          size = ""
+             ) +
+    theme(panel.grid = element_blank(),
+       axis.text = element_text(size = 13,color='black'), text = element_text(size=13, face="bold"),
+            plot.margin = margin(2, 8, 2, 8, "mm"),
+        legend.text = element_text(size=13, face = "plain"),
+       legend.spacing.x = unit(0.2, 'cm')) +
+  guides(size = FALSE, col = guide_legend(nrow = 1) )
+
+
+g1B <- ggarrange(g3,g4, ncol=2, nrow=1, common.legend = TRUE, legend="bottom", labels = c("C.", "D."))
+g1B
+
+
+jpeg("fig1CD.jpg", width = 3100, height = 1500, res = 300)
+g1B
+dev.off()
+
+
+jpeg("fig1CD_nolegend.jpg", width = 3100, height = 1400, res = 300)
+ggarrange(g3,g4, ncol=2, nrow=1, common.legend = TRUE, legend=FALSE, labels = c("C.", "D."))
+dev.off()
+
+```
+
+
+```{r} 
+
+# Figure 2 in the main text
+
+sub <- filter(dflong,  punish_type == 1 & experiment=="CC Treatment" & coop== "Cooperators")
+cnt <- count(sub, punish, experiment)
+cnt$n <- cnt$n / 11  
+g1 <- ggplot(cnt, aes(x=punish, y=n)) + 
+   geom_bar(stat = "identity",fill= 'orange', color='black' , width = 0.6) + 
+  geom_vline(xintercept = 8, color='black', linetype = "dashed", size=0.3) + 
+  scale_x_continuous(limits=c(0.5,10.5), breaks=1:10 ) + 
+     scale_y_continuous(limits=c(0, 25)) +
+    labs( y     = 'Number of Participants',
+          x     = "Deduction Points",
+          title = 'Independent Punishment by Cooperators\nin CC Treatment'
+             ) + 
+    theme_bw() +
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(size = 13), text = element_text(size=13,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 5, 2, 5, "mm")) 
+
+
+sub <- filter(dflong,  punish_type == 1 & experiment=="CP Treatment" & coop== "Cooperators")
+cnt <- count(sub, punish, experiment)
+cnt$n <- cnt$n / 11  
+g2 <- ggplot(cnt, aes(x=punish, y=n)) + 
+   geom_bar(stat = "identity",fill= 'orange', color='black' , width = 0.6) + 
+  geom_vline(xintercept = 8, color='black', linetype = "dashed", size=0.3) + 
+  scale_x_continuous(limits=c(0.5,10.5), breaks=1:10 ) + 
+     scale_y_continuous(limits=c(0, 25)) +
+    labs( y     = '',
+          x     = "Deduction Points",
+          title = 'Independent Punishment by Cooperators\nin CP Treatment'
+             ) + 
+    theme_bw() +
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(size = 13), text = element_text(size=13,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 5, 2, 5, "mm")) 
+
+g2a <- ggarrange(g1, g2, ncol=2, nrow=1, legend="none", labels = c("A.", "B."))
+g2a
+
+jpeg("fig2AB.jpg", width = 3100, height = 1500, res = 300)
+g2a
+dev.off()
+
+
+sub <- filter(dflong, experiment == "CC Treatment" & punish_type == 2) 
+g3 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color='darkgreen', alpha=0.8) + scale_size_area(max_size=10) +
+      labs( y = 'Deduction Points',
+               x = 'Reference Group Behavior\n% of Cooperators',
+               title = 'Norm Enforcement in CC Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_x_discrete(labels=c('<5','10', '20', '30', '40', '50', '60', '70', '80', '90', '>95') ) + 
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 5, "mm")
+        ) 
+
+sub <- filter(dflong, experiment == "CP Treatment" & punish_type == 2) 
+g4 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color='darkgreen', alpha=0.8) + scale_size_area(max_size=10) +
+      labs( y = '',
+               x = 'Reference Group Behavior\nMean Deduction Points',
+               title = 'Conformist Punishment in CP Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 5, "mm")
+        )
+
+g2b <- ggarrange(g3, g4, ncol=2, nrow=1, legend="bottom", labels=c("C.", "D.") )
+g2b
+jpeg("fig2CD.jpg", width = 2900, height = 1650, res = 320)
+g2b
+dev.off()
+
+```
+
+
+```{r}
+
+# Figure S1 in Supplementary Information
+
+std <- function(x) sd(x)/sqrt(length(x))
+df0 <- aggregate(punish ~ experiment + other_punish, data=dflong, 'mean')
+df0$avg <- df0$punish
+df0$std <- aggregate(punish ~ experiment + other_punish, data=dflong, std)$punish
+df0$low <- df0$avg - df0$std
+df0$up <- df0$avg + df0$std
+
+sub <- filter(df0, experiment == "CC Treatment") 
+g1 <- ggplot(sub, aes(x=other_punish, y=avg)) + 
+  geom_line() +
+  geom_errorbar(aes(ymin=low, ymax=up), color='black', width=0) +
+  geom_point()+
+    scale_y_continuous(limits=c(0,5)) + 
+    scale_x_continuous(breaks = seq(0,10,1) ,
+                       labels = c("<5", "10", "20" ,  "30" , "40" , "50" , "60" , "70" ,  "80" , "90", ">95")) + 
+    theme_bw() + 
+    theme(axis.title = element_text(face = "bold")) +
+    labs( y     = 'Deduction Points',
+          x     = "Reference Group Behavior (% of Cooperators)",
+          title = 'CC Treatment (N = 498)'
+             ) +
+    theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11, face="bold"),
+            plot.margin = margin(2, 4, 2, 5, "mm")) 
+
+sub <- filter(df0, experiment == "CP Treatment") 
+g2 <- ggplot(sub, aes(x=other_punish, y=punish)) + 
+  geom_line() +
+  geom_errorbar(aes(ymin=low, ymax=up), color='black', width=0) +
+  geom_point()+
+    scale_y_continuous(limits=c(0,5)) + 
+    scale_x_continuous(breaks = seq(0,10,1) ,
+                       labels = seq(0,10,1)) + 
+    theme_bw() + 
+    labs( y     = '',
+          x     = "Reference Group Behavior (Mean Deduction Points)",
+          title = 'CP Treatment (N = 501)'
+             ) +
+    theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11, face="bold"),
+            plot.margin = margin(2, 4, 2, 5, "mm")) 
+
+gS1 <- ggarrange(g1, g2, ncol=2, nrow=1, legend="none", labels = c("A.", "B."))
+gS1
+
+jpeg("figS1.jpg", width = 1800, height = 800, res = 200)
+gS1
+dev.off()
+
+```
+
+
+
+
+```{r}
+
+# Figure S2 in Supplementary Information
+
+ybar = 0.5
+sub <- filter(dfshort, experiment == "CC Treatment" & coop == "Cooperators")
+observed <- table(sub$punish_type)
+CI <- data.frame(MultinomCI(observed,
+           conf.level=0.95,
+           method="sisonglaz")) 
+CI$punish_type <- row.names(CI)
+
+cnt <- count(sub)
+lab1 <- c("Never\nPunish","Independent\nPunishment", "Norm\nEnforcement", "Decreasing\nPunishment", "Non-\nmonotonic")
+g1 <- ggplot(CI,aes(x = punish_type, y = est )) + 
+  geom_bar( aes(x=punish_type, fill=punish_type, color=punish_type ), stat="identity",  width = 0.6) +
+  geom_text(aes(label=lab1 ),vjust=-0.25,font.size=13) +
+    # geom_errorbar(aes(ymin=lwr.ci, ymax=upr.ci), color='black', width=0.1, position=p) +
+  # geom_point(aes(size=size,shape=punish_type,fill=punish_type), position=p)+ 
+    # scale_y_continuous( labels=scales::percent_format()) +
+    scale_y_continuous(breaks = seq(0,10,1)/10) +
+    coord_cartesian(ylim=c(0, ybar )) + 
+    scale_color_manual(values = c("white", "black", "black", "white", "white")) + 
+    scale_fill_manual(values = c("grey", "orange", "#359135", "#89a2c8", "grey")) + 
+  # scale_x_discrete(labels= )  + 
+  annotate("text", x=5, y=ybar , label= paste("N =", cnt), fontface="bold",font.size=13 ) + 
+    # geom_text(aes(y = ((..count..)/sum(..count..)), label = percent((..count..)/sum(..count..)) ), stat = "count", vjust = -0.25) +
+     theme_bw() + 
+      labs( y     = 'Frequency',
+            x     = "",
+            title = 'Cooperators in CC Treatment'
+               ) + 
+      theme(panel.grid = element_blank(),
+            # axis.text.x = element_text(angle = 45, hjust = 1,color='black'),
+            axis.text.x = element_blank(),
+            axis.text = element_text(size = 13,face="bold",color='black'), 
+            text = element_text(size=13,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 4, 2, 8, "mm"))
+# g1
+
+sub <- filter(dfshort, experiment == "CP Treatment" & coop == "Cooperators")
+cnt <- count(sub)
+
+observed <- table(sub$punish_type)
+CI <- data.frame(MultinomCI(observed,
+           conf.level=0.95,
+           method="sisonglaz")) 
+CI$punish_type <- row.names(CI)
+lab2 <- c("Never\nPunish","Independent\nPunishment", "Conformist\nPunishment", "Decreasing\nPunishment", "Non-\nmonotonic")
+g2 <- ggplot(CI,aes(x = punish_type, y = est )) + 
+  geom_bar( aes(x=punish_type, fill=punish_type, color=punish_type ), stat="identity",  width = 0.6) +
+  geom_text(aes(label=lab2 ),vjust=-0.25,font.size=13) +
+    # geom_errorbar(aes(ymin=lwr.ci, ymax=upr.ci), color='black', width=0.1, position=p) +
+    scale_y_continuous(breaks = seq(0,10,1)/10) +
+  # geom_point(aes(size=size,shape=punish_type,fill=punish_type), position=p)+ 
+    # scale_y_continuous( labels=scales::percent_format()) +
+    coord_cartesian(ylim=c(0,ybar )) + 
+    scale_color_manual(values = c("white", "black", "black", "white", "white")) + 
+    scale_fill_manual(values = c("grey", "orange", "#359135", "#89a2c8", "grey")) + 
+  scale_x_discrete(labels=lab2 )  + 
+  annotate("text", x=5, y=ybar , label= paste("N =", cnt), fontface="bold",font.size=13 ) + 
+    # geom_text(aes(y = ((..count..)/sum(..count..)), label = percent((..count..)/sum(..count..)) ), stat = "count", vjust = -0.25) +
+     theme_bw() + 
+      labs( y     = '',
+            x     = "",
+            title = 'Cooperators in CP Treatment'
+               ) + 
+      theme(panel.grid = element_blank(),
+            # axis.text.x = element_text(angle = 45, hjust = 1,color='black'),
+            axis.text.x = element_blank(),
+            axis.text = element_text(size = 13,face="bold",color='black'), 
+            text = element_text(size=13,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 4, 2, 5, "mm"))
+# g2
+
+
+
+ybar = 0.5
+sub <- filter(dfshort, experiment == "CC Treatment" & coop == "Defectors")
+cnt <- count(sub)
+observed <- table(sub$punish_type)
+CI <- data.frame(MultinomCI(observed,
+           conf.level=0.95,
+           method="sisonglaz")) 
+CI$punish_type <- row.names(CI)
+
+g3 <- ggplot(CI,aes(x = punish_type, y = est )) + 
+  geom_bar( aes(x=punish_type, fill=punish_type, color=punish_type ), stat="identity",  width = 0.6) +
+    geom_text(aes(label=lab1 ),vjust=-0.25,font.size=13) +
+    # geom_errorbar(aes(ymin=lwr.ci, ymax=upr.ci), color='black', width=0.1, position=p) +
+    scale_y_continuous(breaks = seq(0,10,1)/10) +
+  # geom_point(aes(size=size,shape=punish_type,fill=punish_type), position=p)+ 
+    # scale_y_continuous( labels=scales::percent_format()) +
+    coord_cartesian(ylim=c(0,max(CI$upr.ci))) + 
+    scale_color_manual(values = c("white", "black", "black", "white", "white")) + 
+    scale_fill_manual(values = c("grey", "orange", "#359135", "#89a2c8", "grey")) + 
+  scale_x_discrete(labels=c("Never Punish", "Independent Punishment", "Norm Enforcement", "Decreasing Punishment", "Non-monotonic") )  + 
+  annotate("text", x=5, y=max(CI$upr.ci), label= paste("N =", cnt), fontface="bold",font.size=13 ) + 
+    # geom_text(aes(y = ((..count..)/sum(..count..)), label = percent((..count..)/sum(..count..)) ), stat = "count", vjust = -0.25) +
+     theme_bw() + 
+      labs( y     = 'Frequency',
+            x     = "Punishment Strategies",
+            title = 'Defectors in CC Treatment'
+               ) + 
+      theme(panel.grid = element_blank(),
+            # axis.text.x = element_text(angle = 45, hjust = 1,color='black'),
+            axis.text.x = element_blank(),
+            axis.text = element_text(size = 13,face="bold",color='black'), 
+            text = element_text(size=13,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 4, 2, 5, "mm"))
+# g3
+
+ybar = 0.65
+sub <- filter(dfshort, experiment == "CP Treatment" & coop == "Defectors")
+cnt <- count(sub)
+observed <- table(sub$punish_type)
+CI <- data.frame(MultinomCI(observed,
+           conf.level=0.95,
+           method="sisonglaz")) 
+CI$punish_type <- row.names(CI)
+lab2 <- c("Never\nPunish","Independent\nPunishment", "Conformist\nPunishment", "Decreasing\nPunishment", "Non-\nmonotonic")
+g4 <- ggplot(CI,aes(x = punish_type, y = est )) + 
+  geom_bar( aes(x=punish_type, y = est, fill=punish_type, color=punish_type ), stat="identity",  width = 0.6) +
+      geom_text(aes(label=lab2 ),vjust=-0.25,font.size=13) +
+    # geom_errorbar(aes(ymin=lwr.ci, ymax=upr.ci), color='black', width=0.1, position=p) +
+  # geom_point(aes(size=size,shape=punish_type,fill=punish_type), position=p)+ 
+    # scale_y_continuous( labels=scales::percent_format()) +
+    scale_y_continuous(breaks = seq(0,10,1)/10) +
+    coord_cartesian(ylim=c(0,max(CI$upr.ci))) + 
+    scale_color_manual(values = c("white", "black", "black", "white", "white")) + 
+    scale_fill_manual(values = c("grey", "orange", "#359135", "#89a2c8", "grey")) + 
+  scale_x_discrete(labels=c("Never Punish", "Independent Punishment", "Conformist Punishment", "Decreasing Punishment", "Non-monotonic") )  + 
+  annotate("text", x=5, y=max(CI$upr.ci), label= paste("N =", cnt), fontface="bold",font.size=13 ) + 
+    # geom_text(aes(y = ((..count..)/sum(..count..)), label = percent((..count..)/sum(..count..)) ), stat = "count", vjust = -0.25) +
+     theme_bw() + 
+      labs( y     = '',
+            x     = "Punishment Strategies",
+            title = 'Defectors in CP Treatment'
+               ) + 
+      theme(panel.grid = element_blank(),
+            # axis.text.x = element_text(angle = 45, hjust = 1,color='black'),
+            axis.text.x = element_blank(),
+            axis.text = element_text(size = 13,face="bold",color='black'), 
+            text = element_text(size=13,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 4, 2, 5, "mm"))
+# g4
+
+jpeg("figS2.jpg", width = 3200, height = 2500, res = 300)
+ggarrange(g1, g2, g3, g4, ncol=2, legend = "none", nrow=2, labels = c("A.", "B.", "C.","D."))
+dev.off()
+
+```
+ 
+
+```{r}
+
+# Figure S3 in Supplementary Information
+
+sub <- filter(dflong,  punish_type == 1 & experiment=="CC Treatment" & coop== "Defectors")
+cnt <- count(sub, punish, experiment)
+cnt$n <- cnt$n / 11  
+g1 <- ggplot(cnt, aes(x=punish, y=n)) + 
+   geom_bar(stat = "identity",fill= 'orange', color='black' , width = 0.6) + 
+  scale_x_continuous(limits=c(0.5,10.5), breaks=1:10 ) + 
+     scale_y_continuous(limits=c(0,7)) +
+    labs( y     = 'Number of Participants',
+          x     = "Deduction Points",
+          title = 'Independent Punishment by Defectors\nin CC Treatment'
+             ) + 
+    theme_bw() +
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(size = 11), text = element_text(size=11,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 10, 2, 2, "mm")) 
+
+sub <- filter(dflong,  punish_type == 1 & experiment=="CP Treatment" & coop== "Defectors")
+cnt <- count(sub, punish, experiment)
+cnt$n <- cnt$n / 11  
+g2 <- ggplot(cnt, aes(x=punish, y=n)) + 
+   geom_bar(stat = "identity",fill= 'orange', color='black' , width = 0.6) + 
+  scale_x_continuous(limits=c(0.5,10.5), breaks=1:10 ) + 
+     scale_y_continuous(limits=c(0,7)) +
+    labs( y     = '',
+          x     = "Deduction Points",
+          title = 'Independent Punishment by Defectors\nin CP Treatment'
+             ) + 
+    theme_bw() +
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(size = 11), text = element_text(size=11,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 10, 2, 2, "mm"))
+  
+
+gS3 <- ggarrange(g1, g2, ncol=2, nrow=1, legend="none", labels = c("A.", "B."))
+gS3
+
+jpeg("figS3.jpg", width = 1800, height = 750, res = 200)
+gS3
+dev.off()
+
+```
+
+
+
+```{r}
+
+# Figure S4 in Supplementary Information
+
+sub <- filter(dflong, experiment == "CC Treatment" & punish_type == 2 & coop == "Cooperators") 
+g3 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color='darkgreen', shape=19, alpha=0.8) + scale_size_area(max_size=7) +
+      labs( y = 'Deduction Points',
+               x = '',
+               title = 'Norm Enforcement in CC Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_x_discrete(labels=c('<5','10', '20', '30', '40', '50', '60', '70', '80', '90', '>95') ) + 
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 2, "mm")
+        ) 
+
+sub <- filter(dflong, experiment == "CP Treatment" & punish_type == 2 & coop == "Cooperators") 
+g4 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color='darkgreen', shape=19, alpha=0.8) + scale_size_area(max_size=7) +
+      labs( y = '',
+               x = '',
+               title = 'Conformist Punishment in CP Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 2, "mm")
+        )
+
+
+
+sub <- filter(dflong, experiment == "CC Treatment" & punish_type == 3 & coop == "Cooperators") 
+g5 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color="#89a2c8") + scale_size_area(max_size=7) +
+      labs( y = 'Deduction Points',
+               x = '',
+               title = 'Decreasing Punishment in CC Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_x_discrete(labels=c('<5','10', '20', '30', '40', '50', '60', '70', '80', '90', '>95') ) + 
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 2, "mm")
+        ) 
+
+sub <- filter(dflong, experiment == "CP Treatment" & punish_type == 3 & coop == "Cooperators") 
+g6 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color="#89a2c8") + scale_size_area(max_size=7) +
+      labs( y = '',
+               x = '',
+               title = 'Decreasing Punishment in CP Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+  scale_size_continuous(breaks=0:3) + 
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 2, "mm")
+        )
+
+sub <- filter(dflong, experiment == "CC Treatment" & punish_type == 4 & coop == "Cooperators") 
+g7 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color="gray") + scale_size_area(max_size=7) +
+      labs( y = 'Deduction Points',
+               x = 'Reference Group Behavior (% of Cooperators)',
+               title = 'Non-monotonic Punishment in CC Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_x_discrete(labels=c('<5','10', '20', '30', '40', '50', '60', '70', '80', '90', '>95') ) + 
+  scale_y_continuous(breaks=c(0,2,4,6,8,10))+
+  scale_size_continuous(breaks=seq(1,10,2)) +
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 2, "mm")
+        ) 
+
+sub <- filter(dflong, experiment == "CP Treatment" & punish_type == 4 & coop == "Cooperators") 
+g8 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color="gray") + scale_size_area(max_size=7) +
+      labs( y = '',
+               x = 'Reference Group Behavior (Mean Deduction Points)',
+               title = 'Non-monotonic Punishment in CP Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 2, "mm")
+        )
+
+
+gS4 <- ggarrange(g3,g4,g5,g6,g7,g8, ncol=2, nrow=3, legend="right", labels=paste(LETTERS[1:6],".",sep="") )
+gS4
+
+jpeg("figS4.jpg", width = 2000 , height = 2200, res = 200)
+gS4
+annotate_figure(gS4,
+                top = text_grob("Punishment Conducted by Cooperators", face = "bold", size = 14)
+                )
+dev.off()
+
+```
+
+```{r}
+
+# Figure S5 in Supplementary Information
+
+sub <- filter(dflong, experiment == "CC Treatment" & punish_type == 2 & coop == "Defectors") 
+g3 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color='darkgreen', shape=19, alpha=0.8) + scale_size_area(max_size=7) +
+      labs( y = 'Deduction Points',
+               x = '',
+               title = 'Norm Enforcement in CC Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_x_discrete(labels=c('<5','10', '20', '30', '40', '50', '60', '70', '80', '90', '>95') ) + 
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+  scale_size_continuous(breaks=seq(1,10,2)) +
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 2, "mm")
+        ) 
+
+sub <- filter(dflong, experiment == "CP Treatment" & punish_type == 2 & coop == "Defectors") 
+g4 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color='darkgreen', shape=19, alpha=0.8) + scale_size_area(max_size=7) +
+      labs( y = '',
+               x = '',
+               title = 'Conformist Punishment in CP Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 2, "mm")
+        )
+
+
+
+sub <- filter(dflong, experiment == "CC Treatment" & punish_type == 3 & coop == "Defectors") 
+g5 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color="#89a2c8") + scale_size_area(max_size=7) +
+      labs( y = 'Deduction Points',
+               x = '',
+               title = 'Decreasing Punishment in CC Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_x_discrete(labels=c('<5','10', '20', '30', '40', '50', '60', '70', '80', '90', '>95') ) + 
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+  scale_size_continuous(breaks=seq(1,10,2) ) +
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 2, "mm")
+        ) 
+
+sub <- filter(dflong, experiment == "CP Treatment" & punish_type == 3 & coop == "Defectors") 
+g6 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color="#89a2c8") + scale_size_area(max_size=7) +
+      labs( y = '',
+               x = '',
+               title = 'Decreasing Punishment in CP Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+  scale_size_continuous(breaks=1:3) + 
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 2, "mm")
+        )
+
+sub <- filter(dflong, experiment == "CC Treatment" & punish_type == 4 & coop == "Defectors") 
+g7 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color="gray") + scale_size_area(max_size=7) +
+      labs( y = 'Deduction Points',
+               x = 'Reference Group Behavior (% of Cooperators)',
+               title = 'Non-monotonic Punishment in CC Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_x_discrete(labels=c('<5','10', '20', '30', '40', '50', '60', '70', '80', '90', '>95') ) + 
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+  scale_size_continuous(breaks=seq(1,10,2)) +
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 2, "mm")
+        ) 
+
+sub <- filter(dflong, experiment == "CP Treatment" & punish_type == 4 & coop == "Defectors") 
+g8 <- ggplot(sub,  aes(x=factor(other_punish), y=punish)) +
+  geom_count(color="gray") + scale_size_area(max_size=7) +
+      labs( y = '',
+               x = 'Reference Group Behavior (Mean Deduction Points)',
+               title = 'Non-monotonic Punishment in CP Treatment',
+            size=guide_legend(title="")
+             ) +
+  scale_y_continuous(breaks=c(0,2,4,6,8,10)) +
+  scale_size_continuous(breaks=seq(1,10,2) ) +
+    theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 11), text = element_text(size=11,face="bold"),
+            plot.margin = margin(2, 5, 2, 2, "mm")
+        )
+
+
+gS5 <- ggarrange( g3, g4,g5,g6,g7,g8, ncol=2, nrow=3, legend="right", labels=paste(LETTERS[1:6],".",sep="") )
+gS5
+
+jpeg("figS5.jpg", width = 2000 , height = 2200, res = 200)
+gS5
+annotate_figure(gS5,
+                top = text_grob("Punishment Conducted by Defectors", face = "bold", size = 14)
+                )
+dev.off()
+```
+
+
+
+```{r}
+
+# Figure S6 in Supplementary Information
+
+sub <- filter(dfshort, experiment == "CC Treatment" )
+g1 <- ggplot(sub, aes(x=punish_type, y=log(quizfailALL+1), fill=punish_type, color=punish_type))  + 
+      geom_jitter(width = 0.2, height=0.1, size=1, alpha = 0.8) +
+      geom_boxplot(outlier.shape = NA, color='black',  alpha = 0.5) +
+      stat_summary(fun.y=mean, geom="point", color="black", shape=23, size=5, alpha = 0.7) + 
+      scale_color_manual(values = c("grey", "orange", "#359135", "#89a2c8", "grey")) + 
+      scale_fill_manual(values = c("grey", "orange", "#359135", "#89a2c8", "grey")) + 
+      scale_x_discrete(labels=c("Never Punish", "Independent Punishment", "Norm Enforcement", "Decreasing Punishment", "Non-monotonic") )  + 
+      scale_y_continuous(breaks = log(c(0, 2, 10, 50, 200) + 1), labels = c(0, 2, 10, 50, 200) ) + 
+  theme_bw() +
+      labs( y     = 'Quiz Fails',
+            x     = "",
+            title = 'CC Treatment'
+               ) + 
+      theme(panel.grid = element_blank(),
+            axis.text.x = element_text(angle = 45, hjust = 1,color='black'),
+            axis.text = element_text(size = 11), text = element_text(size=12,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 4, 2, 8, "mm"))
+
+sub <- filter(dfshort, experiment == "CP Treatment" )
+g2 <- ggplot(sub, aes(x=factor(punish_type), y=log(quizfailALL+1), fill=factor(punish_type), color=factor(punish_type))) + 
+      geom_jitter(width = 0.2, height=0.1, size=1, alpha = 0.8) +
+      geom_boxplot(outlier.shape = NA, color='black',  alpha = 0.5) +
+      stat_summary(fun.y=mean, geom="point", color="black", shape=23, size=5, alpha = 0.7) + 
+      scale_color_manual(values = c("grey", "orange", "#359135", "#89a2c8", "grey")) + 
+      scale_fill_manual(values = c("grey", "orange", "#359135", "#89a2c8", "grey")) + 
+      scale_x_discrete(labels=c("Never Punish", "Independent Punishment", "Norm Enforcement", "Decreasing Punishment", "Non-monotonic") )  + 
+      scale_y_continuous(breaks = log(c(0, 2, 10, 50, 200) + 1), labels = c(0, 2, 10, 50, 200) ) + 
+  theme_bw() +
+      labs( y     = '',
+            x     = "",
+            title = 'CP Treatment'
+               ) + 
+      theme(panel.grid = element_blank(),
+            axis.text.x = element_text(angle = 45, hjust = 1,color='black'),
+            axis.text = element_text(size = 11), text = element_text(size=12,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 4, 2, 8, "mm") )  
+
+g <- ggarrange(g1, g2,  ncol=2, nrow=1, legend="none", labels = c("A.", "B."))
+g
+
+jpeg("figS6.jpg", width = 1900, height = 1100, res = 200)
+g
+dev.off()
+
+```
+
+```{r}
+
+# Figure S7 in Supplementary Information
+
+sub2 <- filter(dfshort, quizfailALL < 10)
+sub3 <- filter(dfshort, quizfailALL < 3)
+lab1 <- c("Never\nPunish","Independent\nPunishment", "Norm\nEnforcement", "Decreasing\nPunishment", "Non-\nmonotonic")
+lab2 <- c("Never\nPunish","Independent\nPunishment", "Conformist\nPunishment", "Decreasing\nPunishment", "Non-\nmonotonic")
+
+ybar = 0.55
+
+sub <- filter(sub2, experiment == "CC Treatment")
+observed <- table(sub$punish_type)
+CI <- data.frame(MultinomCI(observed,
+           conf.level=0.95,
+           method="sisonglaz")) 
+CI$punish_type <- row.names(CI)
+
+cnt <- count(sub)
+g1 <- ggplot(CI,aes(x = punish_type, y = est )) + 
+  geom_bar( aes(x=punish_type, y = est, fill=punish_type, color=punish_type ), stat="identity",  width = 0.6) +
+      geom_text(aes(label=lab1 ),vjust=-0.25,font.size=13) +
+    # geom_errorbar(aes(ymin=lwr.ci, ymax=upr.ci), color='black', width=0.1, position=p) +
+  # geom_point(aes(size=size,shape=punish_type,fill=punish_type), position=p)+ 
+    # scale_y_continuous( labels=scales::percent_format()) +
+    scale_y_continuous(breaks = seq(0,10,1)/10) +
+    coord_cartesian(ylim=c(0, ybar )) + 
+    scale_color_manual(values = c("white", "black", "black", "white", "white")) + 
+    scale_fill_manual(values = c("grey", "orange", "#359135", "#89a2c8", "grey")) + 
+  scale_x_discrete(labels=c("Never Punish", "Independent Punishment", "Norm Enforcement", "Decreasing Punishment", "Non-monotonic") )  + 
+  annotate("text", x=5, y=ybar , label= paste("N =", cnt), fontface="bold" ) + 
+    # geom_text(aes(y = ((..count..)/sum(..count..)), label = percent((..count..)/sum(..count..)) ), stat = "count", vjust = -0.25) +
+     theme_bw() + 
+      labs( y     = 'Frequency',
+            x     = "",
+            title = 'CC Treatment (Quiz Fails < 10)'
+               ) + 
+      theme(panel.grid = element_blank(),
+            axis.text.x = element_blank(),
+            axis.text = element_text(size = 13,face="bold",color='black'), 
+            text = element_text(size=13,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 4, 2, 5, "mm"))
+
+
+sub <- filter(sub2, experiment == "CP Treatment")
+cnt <- count(sub)
+observed <- table(sub$punish_type)
+CI <- data.frame(MultinomCI(observed,
+           conf.level=0.95,
+           method="sisonglaz")) 
+CI$punish_type <- row.names(CI)
+
+g2 <- ggplot(CI,aes(x = punish_type, y = est )) + 
+  geom_bar( aes(x=punish_type, fill=punish_type, color=punish_type ), stat="identity",  width = 0.6) +
+        geom_text(aes(label=lab2 ),vjust=-0.25,font.size=13) +
+    # geom_errorbar(aes(ymin=lwr.ci, ymax=upr.ci), color='black', width=0.1, position=p) +
+  # geom_point(aes(size=size,shape=punish_type,fill=punish_type), position=p)+ 
+    # scale_y_continuous( labels=scales::percent_format()) +
+    scale_y_continuous(breaks = seq(0,10,1)/10) +
+    coord_cartesian(ylim=c(0, ybar )) + 
+    scale_color_manual(values = c("white", "black", "black", "white", "white")) + 
+    scale_fill_manual(values = c("grey", "orange", "#359135", "#89a2c8", "grey")) + 
+  scale_x_discrete(labels=c("Never Punish", "Independent Punishment", "Conformist Punishment", "Decreasing Punishment", "Non-monotonic") )  + 
+  annotate("text", x=5, y=ybar , label= paste("N =", cnt), fontface="bold" ) + 
+    # geom_text(aes(y = ((..count..)/sum(..count..)), label = percent((..count..)/sum(..count..)) ), stat = "count", vjust = -0.25) +
+     theme_bw() + 
+      labs( y     = '',
+            x     = "",
+            title = 'CP Treatment (Quiz Fails < 10)'
+               ) + 
+      theme(panel.grid = element_blank(),
+            axis.text.x = element_blank(),
+            axis.text = element_text(size = 13,face="bold",color='black'), 
+            text = element_text(size=13,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 4, 2, 5, "mm"))
+g2
+
+sub <- filter(sub3, experiment == "CC Treatment")
+cnt <- count(sub)
+observed <- table(sub$punish_type)
+CI <- data.frame(MultinomCI(observed,
+           conf.level=0.95,
+           method="sisonglaz")) 
+CI$punish_type <- row.names(CI)
+
+g3 <- ggplot(CI,aes(x = punish_type, y = est )) + 
+  geom_bar( aes(x=punish_type, y = est, fill=punish_type, color=punish_type ), stat="identity",  width = 0.6) +
+        geom_text(aes(label=lab1 ),vjust=-0.25,font.size=13) +
+    # geom_errorbar(aes(ymin=lwr.ci, ymax=upr.ci), color='black', width=0.1, position=p) +
+  # geom_point(aes(size=size,shape=punish_type,fill=punish_type), position=p)+ 
+    # scale_y_continuous( labels=scales::percent_format()) +
+    scale_y_continuous(breaks = seq(0,10,1)/10) +
+    coord_cartesian(ylim=c(0, ybar )) + 
+    scale_color_manual(values = c("white", "black", "black", "white", "white")) + 
+    scale_fill_manual(values = c("grey", "orange", "#359135", "#89a2c8", "grey")) + 
+  scale_x_discrete(labels=c("Never Punish", "Independent Punishment", "Norm Enforcement", "Decreasing Punishment", "Non-monotonic") )  + 
+  annotate("text", x=5, y=ybar , label= paste("N =", cnt), fontface="bold" ) + 
+    # geom_text(aes(y = ((..count..)/sum(..count..)), label = percent((..count..)/sum(..count..)) ), stat = "count", vjust = -0.25) +
+     theme_bw() + 
+      labs( y     = 'Frequency',
+            x     = "",
+            title = 'CC Treatment (Quiz Fails < 3)'
+               ) + 
+      theme(panel.grid = element_blank(),
+            axis.text.x = element_blank(),
+            axis.text = element_text(size = 13,face="bold",color='black'), 
+            text = element_text(size=13,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 4, 2, 5, "mm"))
+g3
+
+
+sub <- filter(sub3, experiment == "CP Treatment")
+cnt <- count(sub)
+observed <- table(sub$punish_type)
+CI <- data.frame(MultinomCI(observed,
+           conf.level=0.95,
+           method="sisonglaz")) 
+CI$punish_type <- row.names(CI)
+
+g4 <- ggplot(CI,aes(x = punish_type, y = est )) + 
+  geom_bar( aes(x=punish_type, y = est, fill=punish_type, color=punish_type ), stat="identity",  width = 0.6) +
+        geom_text(aes(label=lab2 ),vjust=-0.25,font.size=13) +
+    # geom_errorbar(aes(ymin=lwr.ci, ymax=upr.ci), color='black', width=0.1, position=p) +
+  # geom_point(aes(size=size,shape=punish_type,fill=punish_type), position=p)+ 
+    # scale_y_continuous( labels=scales::percent_format()) +
+    scale_y_continuous(breaks = seq(0,10,1)/10) +
+    coord_cartesian(ylim=c(0, ybar )) + 
+    scale_color_manual(values = c("white", "black", "black", "white", "white")) + 
+    scale_fill_manual(values = c("grey", "orange", "#359135", "#89a2c8", "grey")) + 
+  scale_x_discrete(labels=c("Never Punish", "Independent Punishment", "Conformist Punishment", "Decreasing Punishment", "Non-monotonic") )  + 
+  annotate("text", x=5, y=ybar , label= paste("N =", cnt), fontface="bold" ) + 
+    # geom_text(aes(y = ((..count..)/sum(..count..)), label = percent((..count..)/sum(..count..)) ), stat = "count", vjust = -0.25) +
+     theme_bw() + 
+      labs( y     = '',
+            x     = "",
+            title = 'CP Treatment (Quiz Fails < 3)'
+               ) + 
+      theme(panel.grid = element_blank(),
+            axis.text.x = element_blank(),
+            axis.text = element_text(size = 13,face="bold",color='black'), 
+            text = element_text(size=13,face="bold",color='black'), 
+            strip.background = element_blank(), 
+            strip.placement = "outside",
+            legend.position = "none",
+            plot.margin = margin(2, 4, 2, 5, "mm"))
+g4
+
+
+g <- ggarrange(g1, g2, g3, g4,  ncol=2, nrow=2, legend="none", labels = c("A.", "B.", "C.", "D."))
+g
+
+jpeg("figS7.jpg", width = 3300, height = 2500, res = 300)
+g
+dev.off()
+
+
+```
+
+ 
+
+

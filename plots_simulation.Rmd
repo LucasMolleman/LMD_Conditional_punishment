@@ -1,0 +1,742 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+# load packages
+library(ggplot2)
+library(plyr)
+library(data.table)
+library(dplyr)
+library(ggpubr)
+library('ggtern')
+theme_set(theme_pubr())
+```
+
+```{r}
+df0 <- read.csv(file="n100T10000_startbybelief_E0.05S0.1U0.5IP30_NExCP50_0to100.csv") 
+glimpse(df0)
+```
+
+
+
+```{r}
+
+# Figure 3
+df <- df0
+table(df$type2,df$type3)
+df$pc_cooperate <- df$fc_cooperate * 100
+df$start <- ""
+df$start[df$start_belief == "good"] <- "high"
+df$start[df$start_belief == "bad"] <- "low"
+table(df$start)
+# df$start <- factor(df$start, levels = c("Start High","Start Low"), labels = c("Start~High","Start~Low"))
+df$comb[df$type2 == 0 & df$type3 == 0]  <- "0-0"
+df$comb[df$type2 == 50 & df$type3 == 0]  <- "50-0"
+df$comb[df$type2 == 0 & df$type3 == 50]  <- "0-50"
+df$comb[df$type2 == 25 & df$type3 == 25]  <- "25-25"
+
+df$case <- paste(df$start,":",df$comb,sep = "")
+
+col.level <- c("high:0-0", "high:50-0", "high:0-50", "high:25-25",
+           "low:0-0", "low:50-0", "low:0-50", "low:25-25")
+col.label <- expression(paste("A. Start High: ", Q[NE],"=0%",", ",Q[CP],"=0%",sep=""),  
+                        paste("C. Start High: ", Q[NE],"=50%",", ",Q[CP],"=0%",sep=""),
+                        paste("E. Start High: ", Q[NE],"=0%",", ",Q[CP],"=50%",sep=""),  
+                        paste("G. Start High: ", Q[NE],"=25%",", ",Q[CP],"=25%",sep=""),
+                        paste("B. Start Low: ", Q[NE],"=0%",", ",Q[CP],"=0%",sep=""),  
+                        paste("D. Start Low: ", Q[NE],"=50%",", ",Q[CP],"=0%",sep=""),
+                        paste("F. Start Low: ", Q[NE],"=0%",", ",Q[CP],"=50%",sep=""),  
+                        paste("H. Start Low: ", Q[NE],"=25%",", ",Q[CP],"=25%",sep=""))
+df$case <- factor(df$case, levels = col.level, labels = col.label)
+# df$case
+
+df.avg <- aggregate(pc_cooperate ~ case + period, df, mean)
+df.example <- filter(df, df$trial == 20)
+
+
+g <- ggplot(df, aes(x = period, y = pc_cooperate)) +
+  geom_line(aes(group = trial), color = 'grey', alpha=0.6, size=0.2) +
+  geom_line(data=df.example,  color = '#378339', alpha=0.9, size=0.4) +
+  geom_line(data=df.avg,  color = 'black', alpha=0.8, size=0.4) +
+  theme_bw() + 
+  scale_y_continuous(breaks = c(0,25,50,75,100)) + 
+  scale_x_continuous() + 
+  labs(title ="", y = "% of Cooperation", x = "Period")+
+  theme(panel.grid = element_blank(),
+        text = element_text(size=14,face="bold"),
+        # axis.title.y =  element_text(angle=0, vjust = 0.5, size=11, face="bold"),
+        strip.text = element_text(size=14,face="bold",hjust = 0,color="black"),
+        # strip.text.y = element_text(size=11, angle=180),
+        strip.background = element_blank(), 
+        strip.placement = "outside",
+        strip.text.y = element_text(angle = 0),
+        panel.spacing = unit(0.7, "lines")) +
+  coord_cartesian(ylim = c(0, 100)) +
+  facet_wrap(~case, ncol = 2, labeller=label_parsed, dir="v" ,scales = "free")
+
+# g
+
+while (!is.null(dev.list()))  dev.off()
+# pdf("fig3.pdf", width =8, height = 12)
+jpeg("fig3.jpg", width = 2300, height = 3200, res = 300)
+g
+dev.off()
+
+```
+
+
+```{r}
+
+# Figure 4 
+
+filename <- "cdf_n100T100000_STARTrelatively bad_E0.05S0.1U0.5IP30_NExCP50_cut0.75_G5trial0_500.csv"
+df <- read.csv(file=filename)
+df.sub <- filter(df, df$type2 == 0 |  df$type2 == 25 |  df$type2 == 50) 
+# df.sub <- df
+names(df.sub)[names(df.sub)=="types"]  <- 'Composition'
+
+# cols <- c("NE=10%, CP=30%" = "bisque3","NE=40%, CP=0%" = "dodgerblue2", "NE=0%, CP=40%" = "darkgreen",  "NE=20%, CP=20%" = "bisque2", "NE=30%, CP=10%" = "bisque1")
+# cols <-  c("#f87f85",
+# "#00caf8",
+# "#ef3cb0")
+# cols <-  c("#0d58bc",
+# "#00b52c",
+# "#cfc27f")
+# cols <-c('#d3f2a3','#4c9b82','#074050')
+cols <-c("#00451c",
+# "#0177f6",
+"#e755ff",
+"#f0e000")[3:1]
+colfunc <- colorRampPalette(c("greenyellow","yellow3","darkorange2","darkred"))
+g1 <- ggplot(df.sub, aes(x=log_period, group =  Composition   )) + 
+    stat_ecdf(aes(color=Composition, linetype=Composition, size=Composition), alpha=1) + 
+  scale_color_manual(name="",values=colfunc(3), labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=50%",sep=""),
+                                                          paste(Q[NE],"=25%",", ",Q[CP],"=25%",sep=""),
+                                                          paste(Q[NE],"=50%",", ",Q[CP],"=0%",sep=""))) +
+  # scale_colour_brewer(name="",palette = "YlOrRd",labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=50%",sep=""), 
+  #                                                         paste(Q[NE],"=25%",", ",Q[CP],"=25%",sep=""), 
+  #                                                         paste(Q[NE],"=50%",", ",Q[CP],"=0%",sep=""))) + 
+  scale_linetype_manual(name="",values=c("solid","dotted","dashed"),labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=50%",sep=""), 
+                                                          paste(Q[NE],"=25%",", ",Q[CP],"=25%",sep=""), 
+                                                          paste(Q[NE],"=50%",", ",Q[CP],"=0%",sep=""))) + 
+    scale_size_manual(name="",values=c(1,1.2,1), labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=50%",sep=""), 
+                                                          paste(Q[NE],"=25%",", ",Q[CP],"=25%",sep=""), 
+                                                          paste(Q[NE],"=50%",", ",Q[CP],"=0%",sep=""))) + 
+    labs( y = 'Cumulative Probability',
+               x = 'Waiting Time for High Cooperation\nwhen Starting Low',
+               title = 'Emergence of Cooperation'
+             ) +
+  coord_cartesian(xlim = c(0, 5)) +
+  scale_x_continuous(labels=expression(0, 10, 10^2, 10^3, 10^4, 10^5, 10^6), breaks = 0:6, expand = c(0, 0)) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        text = element_text(size=14,face="bold"),
+        axis.text = element_text(size=14),
+            plot.margin = margin(2, 8, 2, 5, "mm"),
+        legend.title = element_blank(),     legend.text.align = 0, 
+        # legend.background = element_rect(fill=NA,
+        #                           size=0.2, linetype="solid", 
+        #                           colour ="black"),
+        legend.text = element_text(size=14,face="bold"),legend.box="vertical",legend.position = "bottom",
+        legend.key.width = unit(4,"cm")
+        ) +
+ guides(col = guide_legend(ncol = 1))
+g1
+
+filename <- "cdf_n100T100000_STARTrelatively good_E0.05S0.1U0.5IP30_NExCP30_cut0.25_G5trial0_500.csv"
+df <- read.csv(file=filename)
+df.sub <- filter(df, df$type2 == 0 |  df$type2 == 15 |  df$type2 == 30) 
+names(df.sub)[names(df.sub)=="types"]  <- 'Composition'
+# cols <-  c("#40E0D0",
+# "#FF8C00",
+# "#1a2a6c")
+# cols <-c('#d3f2a3','#4c9b82','#074050')
+cols <-c("#00451c",
+# "#0177f6",
+"#e755ff",
+"#f0e000")[3:1]
+g2 <- ggplot(df.sub, aes(x=log_period, group =  Composition  )) + 
+    stat_ecdf(aes(color=Composition,linetype=Composition,size=Composition), alpha=1) + 
+  scale_color_manual(name="",values=colfunc(3), labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=30%",sep=""),
+                                                          paste(Q[NE],"=15%",", ",Q[CP],"=15%",sep=""),
+                                                          paste(Q[NE],"=30%",", ",Q[CP],"=0%",sep=""))) +
+  # scale_colour_brewer(name="",palette = "YlOrRd",labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=30%",sep=""), 
+  #                                                         paste(Q[NE],"=15%",", ",Q[CP],"=15%",sep=""), 
+  #                                                         paste(Q[NE],"=30%",", ",Q[CP],"=0%",sep=""))) + 
+  scale_linetype_manual(name="",values=c("solid","dotted","dashed"), labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=30%",sep=""), 
+                                                          paste(Q[NE],"=15%",", ",Q[CP],"=15%",sep=""), 
+                                                          paste(Q[NE],"=30%",", ",Q[CP],"=0%",sep=""))) +
+  scale_size_manual(name="",values=c(1,1.2,1), labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=30%",sep=""), 
+                                                          paste(Q[NE],"=15%",", ",Q[CP],"=15%",sep=""), 
+                                                          paste(Q[NE],"=30%",", ",Q[CP],"=0%",sep=""))) +
+    labs( y = '',
+               x = 'Waiting Time for Low Cooperation\nwhen Starting High',
+               title = 'Breakdown of Cooperation'
+             ) +
+  coord_cartesian(xlim = c(0, 5)) +
+  scale_x_continuous(labels=expression(0, 10, 10^2, 10^3, 10^4, 10^5, 10^6), breaks = 0:6, expand = c(0, 0)) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        text = element_text(size=14,face="bold"),
+        axis.text = element_text(size=14),
+            plot.margin = margin(2, 8, 2, 5, "mm"),
+        legend.title = element_blank(),
+        # legend.background = element_rect(fill=NA,
+        #                           size=0.2, linetype="solid",
+        #                           colour ="black"),
+        legend.text = element_text(size=14,face="bold"),
+        legend.text.align = 0,legend.box="vertical",legend.position = "bottom",
+        legend.key.width = unit(4,"cm")
+        ) +
+ guides(col = guide_legend(ncol = 1))
+g2
+
+# pdf("fig4.pdf", width =12, height = 6.8)
+jpeg("fig4.jpg", width = 3300, height = 1900, res = 300)
+ggarrange(g1, g2, ncol=2, nrow=1, common.legend = FALSE, legend="bottom", labels=c("A.","B."))
+dev.off()
+
+```
+
+
+
+
+
+```{r}
+
+# Figure S8
+
+filename <- "cdf_n100T100000_STARTrelatively bad_E0.05S0.1U0.5IP30_NExCP50_cut0.75_G5trial0_500.csv"
+df <- read.csv(file=filename)
+# df.sub <- filter(df, df$type2 != 25 )
+df.sub <- df
+# df.sub <- df
+names(df.sub)[names(df.sub)=="types"]  <- 'Composition'
+
+# cols <- c("NE=10%, CP=30%" = "bisque3","NE=40%, CP=0%" = "dodgerblue2", "NE=0%, CP=40%" = "darkgreen",  "NE=20%, CP=20%" = "bisque2", "NE=30%, CP=10%" = "bisque1")
+# cols <-  c("#f87f85",
+# "#f19c01",
+# "#977500",
+# "#00caf8",
+# "#a8cb71",
+# "#593dbf",
+# "#ef3cb0")
+# cols <-c("#295838",
+# "#565300",
+# "#0077fb",
+# "#2da000",
+# "#01ea98",
+# "#c3ed8c")
+# 
+# # cols <- c('#f7feae','#b7e6a5','#7ccba2','#46aea0','#089099','#00718b','#045275')
+# # cols <-c('#ffc6c4','#f4a3a8','#e38191','#cc607d','#ad466c','#8b3058','#672044')
+# cols <-c('#d3f2a3','#97e196','#6cc08b','#4c9b82','#217a79','#105965','#074050')
+cols <-c("#350230",
+"#003e99",
+"#e50026",
+"#9161ff",
+"#5a8d00",
+"#feb469",
+"#6abaff")[7:1]
+# cols <-c("#3d0010",
+# "#004027",
+# "#6963ff",
+# "#c49000",
+# "#00aaf9",
+# "#00c70c",
+# "#d6c384")[7:1]
+colfunc <- colorRampPalette(c("#d3f2a3","yellow3","darkorange2","darkred"))
+
+colfunc <- colorRampPalette(c("greenyellow","yellow3","darkorange2","darkred"))
+g1 <- ggplot(df.sub, aes(x=log_period, group =  reorder(Composition, desc(Composition))   )) + 
+    stat_ecdf(aes(color=Composition,linetype=Composition,size=Composition), alpha=0.9) +
+   scale_color_manual(name="",values=colfunc(7),labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=50%",sep=""), 
+                                                paste(Q[NE],"=10%",", ",Q[CP],"=40%",sep=""), 
+                                                paste(Q[NE],"=20%",", ",Q[CP],"=30%",sep=""),
+                                                paste(Q[NE],"=25%",", ",Q[CP],"=25%",sep=""),
+                                                paste(Q[NE],"=30%",", ",Q[CP],"=20%",sep=""),
+                                                paste(Q[NE],"=40%",", ",Q[CP],"=10%",sep=""),
+                                                paste(Q[NE],"=50%",", ",Q[CP],"= 0%",sep=""))) + 
+      # scale_colour_brewer(name="",palette = "YlOrRd",labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=50%",sep=""), 
+      #                                           paste(Q[NE],"=10%",", ",Q[CP],"=40%",sep=""), 
+      #                                           paste(Q[NE],"=20%",", ",Q[CP],"=30%",sep=""),
+      #                                           paste(Q[NE],"=25%",", ",Q[CP],"=25%",sep=""),
+      #                                           paste(Q[NE],"=30%",", ",Q[CP],"=20%",sep=""),
+      #                                           paste(Q[NE],"=40%",", ",Q[CP],"=10%",sep=""),
+      #                                           paste(Q[NE],"=50%",", ",Q[CP],"= 0%",sep=""))) + 
+  scale_linetype_manual(name="",values=c("solid","dashed", "12345678","dotted","longdash","twodash","dotdash"),
+                 labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=50%",sep=""), 
+                                                paste(Q[NE],"=10%",", ",Q[CP],"=40%",sep=""), 
+                                                paste(Q[NE],"=20%",", ",Q[CP],"=30%",sep=""),
+                                                paste(Q[NE],"=25%",", ",Q[CP],"=25%",sep=""),
+                                                paste(Q[NE],"=30%",", ",Q[CP],"=20%",sep=""),
+                                                paste(Q[NE],"=40%",", ",Q[CP],"=10%",sep=""),
+                                                paste(Q[NE],"=50%",", ",Q[CP],"= 0%",sep=""))) + 
+  scale_size_manual(name="",values=c(0.8,0.8,0.8,0.8,0.8,0.8,0.8), labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=50%",sep=""), 
+                                                paste(Q[NE],"=10%",", ",Q[CP],"=40%",sep=""), 
+                                                paste(Q[NE],"=20%",", ",Q[CP],"=30%",sep=""),
+                                                paste(Q[NE],"=25%",", ",Q[CP],"=25%",sep=""),
+                                                paste(Q[NE],"=30%",", ",Q[CP],"=20%",sep=""),
+                                                paste(Q[NE],"=40%",", ",Q[CP],"=10%",sep=""),
+                                                paste(Q[NE],"=50%",", ",Q[CP],"= 0%",sep=""))) + 
+    labs( y = 'Cumulative Probability',
+               x = 'Waiting Time for High Cooperation\nwhen Starting Low',
+               title = 'Emergence of Cooperation'
+             ) +
+  coord_cartesian(xlim = c(0, 5)) +
+  scale_x_continuous(labels=expression(0, 10, 10^2, 10^3, 10^4, 10^5, 10^6), breaks = 0:6, expand = c(0, 0)) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        text = element_text(size=13,face="bold"),
+        axis.text = element_text(size=13),
+            plot.margin = margin(2, 8, 2, 5, "mm"),
+        legend.title = element_blank(),        
+        # legend.background = element_rect(fill=NA,
+        #                           size=0.2, linetype="solid", 
+        #                           colour ="black"),
+        legend.text = element_text(size=13,face="bold"),legend.text.align = 0,
+        legend.key.width = unit(4,"cm")
+        )  +
+ guides(col = guide_legend(ncol = 1))
+# g1
+
+  
+filename <- "cdf_n100T100000_STARTrelatively good_E0.05S0.1U0.5IP30_NExCP30_cut0.25_G5trial0_500.csv"
+df <- read.csv(file=filename)
+# df.sub <- filter(df,  df$type2 != 15 )
+df.sub <- df
+names(df.sub)[names(df.sub)=="types"]  <- 'Composition'
+cols <-  c("#f87f85",
+"#977500",
+"#00caf8",
+"#593dbf",
+"#ef3cb0")
+# cols <-c('#d3f2a3','#6cc08b','#4c9b82','#105965','#074050')
+cols <-c("#660036",
+# "#004061",
+"#e50026",
+"#9161ff",
+# "#5a8d00",
+"#feb469",
+"#6abaff")[5:1]
+g2 <- ggplot(df.sub, aes(x=log_period, group =  reorder(Composition, desc(Composition))   )) + 
+    stat_ecdf(aes(color=Composition,linetype=Composition,size=Composition), alpha=0.9) + 
+  scale_color_manual(name="",values=colfunc(5),labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=30%",sep=""),
+                                                paste(Q[NE],"=10%",", ",Q[CP],"=20%",sep=""),
+                                                paste(Q[NE],"=15%",", ",Q[CP],"=15%",sep=""),
+                                                paste(Q[NE],"=20%",", ",Q[CP],"=10%",sep=""),
+                                                paste(Q[NE],"=30%",", ",Q[CP],"= 0%",sep=""))) +
+    # scale_colour_brewer(name="",palette = "YlOrRd",labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=30%",sep=""), 
+    #                                             paste(Q[NE],"=10%",", ",Q[CP],"=20%",sep=""), 
+    #                                             paste(Q[NE],"=15%",", ",Q[CP],"=15%",sep=""),
+    #                                             paste(Q[NE],"=20%",", ",Q[CP],"=10%",sep=""),
+    #                                             paste(Q[NE],"=30%",", ",Q[CP],"= 0%",sep=""))) + 
+  scale_linetype_manual(name="",values=c("solid","dashed","dotted","longdash","dotdash"),
+                        labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=30%",sep=""), 
+                                                paste(Q[NE],"=10%",", ",Q[CP],"=20%",sep=""), 
+                                                paste(Q[NE],"=15%",", ",Q[CP],"=15%",sep=""),
+                                                paste(Q[NE],"=20%",", ",Q[CP],"=10%",sep=""),
+                                                paste(Q[NE],"=30%",", ",Q[CP],"= 0%",sep=""))) + 
+  scale_size_manual(name="",values=c(0.8,0.8,0.8,0.8,0.8,0.8,0.8), labels = expression(paste(Q[NE],"= 0%",",  ",Q[CP],"=30%",sep=""),
+                                                paste(Q[NE],"=10%",", ",Q[CP],"=20%",sep=""),
+                                                paste(Q[NE],"=15%",", ",Q[CP],"=15%",sep=""),
+                                                paste(Q[NE],"=20%",", ",Q[CP],"=10%",sep=""),
+                                                paste(Q[NE],"=30%",", ",Q[CP],"= 0%",sep=""))  ) +
+    labs( y = '',
+               x = 'Waiting Time for Low Cooperation\nwhen Starting High',
+               title = 'Breakdown of Cooperation'
+             ) +
+  coord_cartesian(xlim = c(0, 5)) +
+  scale_x_continuous(labels=expression(0, 10, 10^2, 10^3, 10^4, 10^5, 10^6), breaks = 0:6, expand = c(0, 0)) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        text = element_text(size=13,face="bold"),
+        axis.text = element_text(size=13),
+            plot.margin = margin(2, 8, 2, 5, "mm"),
+        legend.title = element_blank(),
+        # legend.background = element_rect(fill=NA,
+        #                           size=0.2, linetype="solid",
+        #                           colour ="black"),
+        legend.text = element_text(size=13,face="bold"),legend.text.align = 0,
+        legend.key.width = unit(4,"cm")
+        )  +
+ guides(col = guide_legend(ncol = 1))
+# g2
+
+jpeg("figS8.jpg", width =3000, height = 2000, res = 300)
+ggarrange(g1, g2, ncol=2, nrow=1, common.legend = FALSE, legend="bottom", labels=c("A.","B."), align = "h")
+dev.off()
+
+```
+
+
+
+
+
+
+
+```{r}
+
+# Figure S9
+
+df <- read.csv(file="n100T100000_E0.05S0.1U0.5G5_trial0_30.csv")
+df
+df.avg <- aggregate(fc_cooperate ~ type1 + type2 + type3 + start_belief + type1pc, df, mean)
+df.avg$CoopEq <- aggregate(CoopEq ~ type1 + type2 + type3 + start_belief + type1pc, df, mean)$CoopEq
+df.avg$IP <- factor(df.avg$type1, levels = seq(0,50,10), 
+                    labels = expression(
+                      paste(Q[IP],"=",0,"%",sep = ""),
+                      paste(Q[IP],"=",10,"%",sep = ""),
+                      paste(Q[IP],"=",20,"%",sep = ""),
+                      paste(Q[IP],"=",30,"%",sep = ""),
+                      paste(Q[IP],"=",40,"%",sep = ""),
+                      paste(Q[IP],"=",50,"%",sep = "")
+                    ) )
+
+#define color palette
+# colfunc <- colorRampPalette(c("darkred","darkorange2","yellow3","greenyellow"))
+colfunc <- colorRampPalette(c("darkred","darkorange2","yellow3","#d3f2a3"))
+
+
+df.sub <- filter(df.avg, start_belief == 'bad')
+# colors = (df.sub$fc_cooperate*100 < 75 & df.sub$fc_cooperate*100 > 25)
+colors = (df.sub$fc_cooperate*100 < 60)
+colors2 <- c()
+# colors2[colors == TRUE] <- 'grey40'
+colors2[colors == FALSE] <- 'white'
+colors2[colors == TRUE] <- 'black'
+# colors2[colors == FALSE] <- 'black'
+g1 <- ggplot(df.sub, aes(type2, type3) ) + 
+                  geom_tile(aes(fill = fc_cooperate*100 ), width=9.5, height=9.5, colour = "white") + 
+                  geom_text(aes(label=round(fc_cooperate*100)), color=colors2, size=3) + 
+                  # + geom_text(aes(label=CoopEq*100), size=12)
+                  # scale_fill_gradient(low = "white" ,high = "steelblue")
+                  # scale_fill_gradient2(low='greenyellow', mid='yellow3',  high='darkorange2', midpoint = 50, name="", breaks=seq(0,100,25), limits=c(0,100)) + 
+    scale_fill_gradientn(colours = rev(colfunc(100)),name="", breaks=seq(0,100,20), limits=c(0,100) ) +
+                  coord_cartesian(xlim = c(-5,105), ylim = c(-5,105)) + 
+                  scale_x_continuous(breaks = seq(0,100,10)) +
+                   scale_y_continuous(breaks = seq(0,100,10)) + 
+                  labs(
+                     # fill = 'Time% in Cooperation Eq (>{}% Cooperate)',
+                     y = expression(paste(Q[CP], " (%)")),
+                     x = expression(paste(Q[NE], " (%)")),
+                     title = 'A. Start from Low Cooperation'
+                   ) + 
+                  facet_wrap(~ IP, nrow=2, labeller=label_parsed) +
+                  theme_minimal() +
+                  theme(panel.grid.major = element_line(colour = "grey90"),
+                        panel.grid.minor = element_blank(),
+                        strip.text = element_text(size=12, face='bold'),
+                        axis.title.y = element_text(angle = 0, vjust=0.5),
+                        plot.title=element_text(hjust=0, vjust=0.5),
+                        text = element_text(size=12, face='bold'),
+                        plot.margin = unit(c(1,1,1,1), "lines")) 
+
+
+
+df.sub <- filter(df.avg, start_belief == 'good')
+# colors = (df.sub$fc_cooperate*100 < 75 & df.sub$fc_cooperate*100 > 25)
+colors = (df.sub$fc_cooperate*100 < 60)
+colors2 <- c()
+# colors2[colors == TRUE] <- 'grey40'
+colors2[colors == FALSE] <- 'white'
+colors2[colors == TRUE] <- 'black'
+# colors2[colors == FALSE] <- 'black'
+# c('#d3f2a3','#6cc08b','#4c9b82','#217a79','#074050')
+
+
+g2 <- ggplot(df.sub, aes(type2, type3) ) + 
+                  geom_tile(aes(fill = fc_cooperate*100 ), width=9.5, height=9.5, colour = "white") + 
+                  geom_text(aes(label=round(fc_cooperate*100)), color=colors2, size=3) + 
+                  # + geom_text(aes(label=CoopEq*100), size=12)
+                  # scale_fill_gradient(low = "white" ,high = "steelblue")
+                  # scale_fill_gradient2(low='#d3f2a3', mid='#4c9b82',  high='#074050', midpoint = 50, name="", breaks=seq(0,100,25), limits=c(0,100)) +
+   # scale_fill_gradient2(low='greenyellow', mid='yellow3',  high='darkorange2', midpoint = 50, name="", breaks=seq(0,100,20), limits=c(0,100)) + 
+  scale_fill_gradientn(colours = rev(colfunc(100)),name="", breaks=seq(0,100,20), limits=c(0,100) ) +
+                  coord_cartesian(xlim = c(-5,105), ylim = c(-5,105)) + 
+                  scale_x_continuous(breaks = seq(0,100,10)) +
+                   scale_y_continuous(breaks = seq(0,100,10)) + 
+                  labs(
+                     # fill = 'Time% in Cooperation Eq (>{}% Cooperate)',
+                     y = expression(paste(Q[CP], " (%)")),
+                     x = expression(paste(Q[NE], " (%)")),
+                     title = 'B. Start from High Cooperation'
+                   ) + 
+                  facet_wrap(~ IP, nrow=2, labeller=label_parsed) +
+                  theme_minimal() +
+                  theme(panel.grid.major = element_line(colour = "grey90"),
+                        panel.grid.minor = element_blank(),
+                        axis.title.y = element_text(angle = 0, vjust=0.5),
+                        strip.text = element_text(size=12, face='bold'),
+                        plot.title=element_text(hjust=0, vjust=0.5),
+                        text = element_text(size=12, face='bold'),
+                        plot.margin = unit(c(1,1,1,1), "lines")) 
+
+jpeg("figS9A.jpg", width = 3000, height = 2000, res = 300)
+g1 
+dev.off()
+
+
+
+jpeg("figS9B.jpg", width = 3000, height = 2000, res = 300)
+g2 
+dev.off()
+
+```
+
+
+```{r}
+
+# Figure S11
+# df1 <- read.csv("/Volumes/Extreme SSD/ConditionPunishmentSimulation/data/n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial0_1.csv")
+# df2 <- read.csv("/Volumes/Extreme SSD/ConditionPunishmentSimulation/data/n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial1_2.csv")
+# df3 <- read.csv("/Volumes/Extreme SSD/ConditionPunishmentSimulation/data/n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial2_3.csv")
+# df4 <- read.csv("/Volumes/Extreme SSD/ConditionPunishmentSimulation/data/n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial3_5.csv")
+
+df1 <- read.csv("/Volumes/Xueheng/ConditionPunishmentSimulation/data/n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial0_1.csv")
+df2 <- read.csv("/Volumes/Xueheng/ConditionPunishmentSimulation/data/n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial1_2.csv")
+df3 <- read.csv("/Volumes/Xueheng/ConditionPunishmentSimulation/data/n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial2_3.csv")
+df4 <- read.csv("/Volumes/Xueheng/ConditionPunishmentSimulation/data/n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial3_5.csv")
+
+# df1 <- read.csv('n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial0_2.csv')
+# df2 <- read.csv('n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial2_5.csv')
+# df1 <- read.csv('n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial0_1.csv')
+# df2 <- read.csv('n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial1_2.csv')
+# df3 <- read.csv('n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial2_3.csv')
+# df4 <- read.csv('n100T10000_4types_step1_E0.05S0.1U0.5IP30G5trial3_5.csv')
+df <- rbind(df1,df2,df3,df4)
+
+```
+
+```{r}
+df$CoopEq <- (df$fc_cooperate > 0.75)
+head(df)
+heatdf <- aggregate(fc_cooperate ~ type1 + type2 + type3 + type4, df, mean)
+heatdf1 <- aggregate(CoopEq ~ type1 + type2 + type3 + type4, df, mean)
+heatdf$CoopEq <- heatdf1$CoopEq
+heatdf
+heatdf$conditionals <- paste("NE + CP + DP = ", heatdf$type2 + heatdf$type3 + heatdf$type4, "%", sep="")
+heatdf
+
+```
+
+```{r}
+
+#figS11
+
+#define color palette
+colfunc <- colorRampPalette(c("#d3f2a3","yellow3","darkorange2","darkred"))
+
+heatdf$condition <- factor(heatdf$conditionals, 
+                           labels = expression(
+                             paste(Q[NE],"+",Q[CP],"+",Q[DP],"=30%",sep=""),
+                             paste(Q[NE],"+",Q[CP],"+",Q[DP],"=40%",sep=""),
+                             paste(Q[NE],"+",Q[CP],"+",Q[DP],"=50%",sep=""),
+                             paste(Q[NE],"+",Q[CP],"+",Q[DP],"=60%",sep=""),
+                             paste(Q[NE],"+",Q[CP],"+",Q[DP],"=70%",sep="")
+                           ))
+g <- ggtern(heatdf,aes(x=type2,y=type3,z=type4,value=CoopEq)) + 
+  geom_point(size=5, aes(color=CoopEq*100), alpha = 1) +
+  theme_bw() +
+  # scale_color_gradient2(low = "red", mid="yellow", high = "#30972b", midpoint = 50, breaks=seq(0,100,25), limits=c(0,100),  name="% Time\nin High Cooperation") +
+    # scale_color_gradient2(low='#d3f2a3', mid='#4c9b82',  high='#074050', midpoint = 50, breaks=seq(0,100,25), limits=c(0,100),  name="% Time\nin High Cooperation") +
+  scale_color_gradientn(colors = colfunc(100),breaks=seq(0,100,25), limits=c(0,100),  name="% Time\nin High Cooperation") +
+  facet_grid(~condition, labeller = label_parsed) + 
+  Llab("NE") + Tlab("CP") +  Rlab("DP") + 
+  theme(text = element_text(size=12)) + 
+  theme_hidelabels() +
+    theme(panel.grid = element_blank(),
+        text = element_text(size=13),
+        axis.title.y =  element_text(size=13, vjust = 1),
+        strip.text = element_text(size=13),
+        # strip.text.y = element_text(size=11, face="bold"),
+        strip.background = element_blank(), 
+        strip.placement = "outside") 
+g
+jpeg("figS11_row1.jpg", width = 4000, height = 1000, res = 300)
+g
+dev.off()
+
+
+g <- ggtern(heatdf,aes(x=type2,y=type3,z=type4,value=fc_cooperate*100)) + 
+  geom_point(size=5, aes(color=fc_cooperate*100), alpha = 1) +
+  theme_bw() +
+  # scale_color_gradient2(low = "red", mid="yellow", high = "#30972b", midpoint = 50, name="% of Cooperation") +
+    # scale_color_gradient2(low='#d3f2a3', mid='#4c9b82',  high='#074050', midpoint = 60, breaks=seq(0,100,20), limits=c(20,100), name="% of Cooperation") +
+  scale_color_gradientn(colors = colfunc(80), breaks=seq(0,100,20), limits=c(20,100), name="% of Cooperation") +
+  facet_grid(~condition, labeller = label_parsed) + 
+  # title("Independent Punishment: 30%") + 
+  Llab("NE") + Tlab("CP") +  Rlab("DP") + 
+  theme(text = element_text(size=12)) + 
+  theme_hidelabels() +
+    theme(panel.grid = element_blank(),
+        text = element_text(size=13),
+        axis.title.y =  element_text(angle=0, vjust = 0.5, size=13),
+        strip.text = element_text(size=13),
+        # strip.text.y = element_text(size=11, angle=180, face="bold"),
+        strip.background = element_blank(), 
+        strip.placement = "outside") 
+# g
+
+
+jpeg("figS11_row2.jpg", width = 4000, height = 1000, res = 300)
+g
+dev.off()
+
+
+```
+
+```{r}
+# Figure S10: load data
+df.bad1 <- read.csv("cdf_n100T100000_startbad_E0.05S0.1U0.5G5_allcombination_trial_0_10.csv")
+df.bad2 <- read.csv("cdf_n100T100000_startbad_E0.05S0.1U0.5G5_allcombination_trial_10_20.csv")
+df.bad3 <- read.csv("cdf_n100T100000_startbad_E0.05S0.1U0.5G5_allcombination_trial_20_30.csv")
+df.bad <- rbind(df.bad1,df.bad2,df.bad3)
+df.bad$transition <- "badtogood"
+df.bad
+
+df.good1 <- read.csv("cdf_n100T100000_startgood_E0.05S0.1U0.5G5_allcombination_trial_0_15.csv")
+df.good2 <- read.csv("cdf_n100T100000_startgood_E0.05S0.1U0.5G5_allcombination_trial_15_30.csv")
+df.good <- rbind(df.good1,df.good2)
+df.good$transition <- "goodtobad"
+df.good
+
+df <- rbind(df.bad, df.good)
+
+table(df$trial, df$transition)
+
+```
+
+
+
+```{r}
+
+# Figure S10
+
+
+df.median <- aggregate(period ~ type1 + type2 + type3 + transition, df, median)
+df.median$period2 <- df.median$period
+df.median$period2[df.median$period > 100000] <- 1000000 
+df.median$logperiod <- factor(round(log10(df.median$period2)), 
+                              labels = c("<10", "10~100", "100~1,000", "1,000~10,000",
+                                         "10,000~100,000", ">100,000") )
+table(df.median$logperiod)
+
+df.median$IP <- factor(df.median$type1, levels = seq(0,50,10), 
+                    labels = expression(
+                      paste(Q[IP],"=",0,"%",sep = ""),
+                      paste(Q[IP],"=",10,"%",sep = ""),
+                      paste(Q[IP],"=",20,"%",sep = ""),
+                      paste(Q[IP],"=",30,"%",sep = ""),
+                      paste(Q[IP],"=",40,"%",sep = ""),
+                      paste(Q[IP],"=",50,"%",sep = "")
+                    ) )
+
+
+df.sub <- filter(df.median, transition == 'badtogood')
+# colors = ( df.sub$logperiod <= 2 & df.sub$logperiod >= 4)
+# colors2 <- c()
+# colors2[colors == TRUE] <- 'grey40'
+# colors2[colors == FALSE] <- 'white'
+
+# col <- c("#bb0036", "#db6600","#ddc73b","#00c459","#3b9900")[5:1]
+# col <- c('#d3f2a3','#6cc08b','#4c9b82','#217a79','#074050')[5:1]
+# col[6] <- "grey85"
+colfunc <- colorRampPalette(c("darkred","darkorange2","yellow3","#d3f2a3"))
+names(col) <- levels(df.median$logperiod)
+
+g1 <- ggplot(df.sub, aes(type2, type3) ) + 
+                  geom_tile(aes(fill =logperiod ), width=9.5, height=9.5, colour = "white") + 
+                  # geom_text(aes(label=logperiod ), size=3) + 
+                  # + geom_text(aes(label=CoopEq*100), size=12)
+                  # scale_fill_gradient(low = "white" ,high = "steelblue")
+                  scale_fill_manual(values = colfunc(6) ) + 
+                  coord_cartesian(xlim = c(-5,105), ylim = c(-5,105)) + 
+                  scale_x_continuous(breaks = seq(0,100,10)) +
+                   scale_y_continuous(breaks = seq(0,100,10)) + 
+                  labs(
+                     # fill = 'Time% in Cooperation Eq (>{}% Cooperate)',
+                     y = expression(paste(Q[CP], " (%)")),
+                     x = expression(paste(Q[NE], " (%)")),
+                     title = 'A. Waiting Time from Low to High Cooperation',
+                     legend.title = "",
+                     fill = "Periods"
+                   ) + 
+                  facet_wrap(~ IP, nrow=2, labeller=label_parsed) +
+                  theme_minimal() +
+                  theme(panel.grid.major = element_line(colour = "grey90"),
+                        panel.grid.minor = element_blank(),
+                        axis.title.y = element_text(angle = 0, vjust=0.5),
+                        strip.text = element_text(size=13, face='bold'),
+                        plot.title=element_text(hjust=0, vjust=0.5),
+                        text = element_text(size=13, face='bold'),
+                        plot.margin = unit(c(1,1,1,1), "lines")) 
+
+
+
+# g1 
+
+jpeg("figS10A.jpg", width = 3200, height = 1900, res = 300)
+g1 
+dev.off()
+
+df.sub <- filter(df.median, transition == 'goodtobad')
+# colors = ( df.sub$logperiod <= 2 & df.sub$logperiod >= 4)
+# colors2 <- c()
+# colors2[colors == TRUE] <- 'grey40'
+# colors2[colors == FALSE] <- 'white'
+
+# col <- c("#bb0036", "#db6600","#ddc73b","#00c459","#3b9900")
+# col <- c('#d3f2a3','#6cc08b','#4c9b82','#217a79','#074050')
+# col[6] <- "grey30"
+names(col) <- levels(df.median$logperiod)
+
+g2 <- ggplot(df.sub, aes(type2, type3) ) + 
+                  geom_tile(aes(fill =logperiod ), width=9.5, height=9.5, colour = "white") + 
+                  # geom_text(aes(label=logperiod ), size=3) + 
+                  # + geom_text(aes(label=CoopEq*100), size=12)
+                  # scale_fill_gradient(low = "white" ,high = "steelblue")
+                  scale_fill_manual(values = rev(colfunc(6)) ) + 
+                  coord_cartesian(xlim = c(-5,105), ylim = c(-5,105)) + 
+                  scale_x_continuous(breaks = seq(0,100,10)) +
+                   scale_y_continuous(breaks = seq(0,100,10)) + 
+                  labs(
+                     # fill = 'Time% in Cooperation Eq (>{}% Cooperate)',
+                     y = expression(paste(Q[CP], " (%)")),
+                     x = expression(paste(Q[NE], " (%)")),
+                     title = 'B. Waiting Time from High to Low Cooperation',
+                     fill = "Periods"
+                   ) + 
+                  facet_wrap(~ IP, nrow=2, labeller=label_parsed) +
+                  theme_minimal() +
+                  theme(panel.grid.major = element_line(colour = "grey90"),
+                        panel.grid.minor = element_blank(),
+                        axis.title.y = element_text(angle = 0, vjust=0.5),
+                        strip.text = element_text(size=13, face='bold'),
+                        plot.title=element_text(hjust=0, vjust=0.5),
+                        text = element_text(size=13, face='bold'),
+                        plot.margin = unit(c(1,1,1,1), "lines")) 
+
+
+
+# g2 
+
+
+jpeg("figS10B.jpg", width = 3200, height = 1900, res = 300)
+g2
+dev.off()
+```
+
+
+
+
+
+
+
+
